@@ -23,11 +23,9 @@ class zika_upload(upload):
         return tmp_name
 
     def format_schema(self):
-        '''
-        '''
         pass
 
-    def upload_documents(self, exclusive, **kwargs):
+    def upload_documents(self, **kwargs):
         '''
         Insert viruses into collection
         '''
@@ -59,8 +57,8 @@ class zika_upload(upload):
         updated = []
         for db_strain, v in update_viruses.items():  # determine if virus has new information
             document = db_strain_to_viruses[db_strain]
-            updated_meta = self.update_document_meta(document, v, self.overwritable_virus_fields, **kwargs)
-            if updated_meta:
+            updated_base = self.update_base(document, v, v.keys(), v['strain'], **kwargs)
+            if updated_base:
                 document['timestamp'] = v['timestamp']
                 updated.append(document)
         try:

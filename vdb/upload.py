@@ -224,8 +224,8 @@ class upload(parse):
             for db_strain, v in update_viruses.items():  # determine if virus has new information
                 document = db_strain_to_viruses[db_strain]
                 updated_sequence = self.update_document_sequence(document, v, **kwargs)
-                updated_meta = self.update_document_meta(document, v, self.overwritable_virus_fields, **kwargs)
-                if updated_sequence or updated_meta:
+                updated_base = self.update_base(document, v, v.keys(), v['strain'], **kwargs)
+                if updated_sequence or updated_base:
                     document['timestamp'] = v['timestamp']
                     updated.append(document)
             try:
@@ -257,8 +257,8 @@ class upload(parse):
                 # Virus exists in table so just add sequence information and update meta data if needed
                 else:
                     updated_sequence = self.update_document_sequence(document, virus, **kwargs)
-                    updated_meta = self. update_document_meta(relaxed_name, document, virus, self.overwritable_virus_fields, **kwargs)
-                    if updated_sequence or updated_meta:
+                    updated_base = self.update_base(document, virus, virus.keys(), virus['strain'], **kwargs)
+                    if updated_sequence or updated_base:
                         document['timestamp'] = virus['timestamp']
                         r.table(self.table).insert(document, conflict="replace").run()
 
@@ -281,23 +281,22 @@ class upload(parse):
         name = re.sub(r"/", '', name)
         return name
 
-    def update_document_meta(self, document, v, overwritable_fields, overwrite, **kwargs):
+    def update_base(self, document, v, fields, strain, overwrite, **kwargs):
         '''
         update overwritable fields at the base level of the document
         '''
-        updated = False
-        for field in overwritable_fields:
-            # update if field not present in document
-            if field not in document:
-                if field in v:
-                    print("Creating virus field ", field, " assigned to ", v[field])
+        updated =False
+        check_fields = [field for field in fields if field not in ['timestamp']]
+        for field in check_fields:
+            if field in v and (isinstance(v[field], (basestring, int, float, bool))):
+                # update if field not present in document
+                if field not in document:
+                    print("Creating field ", field, " assigned to \"", v[field] + "\" for strain: " + strain)
                     document[field] = v[field]
                     updated = True
-            #update doc_virus information if virus info is different, or if overwrite is false update doc_virus information only if virus info is different and not null
-            elif (overwrite and document[field] != v[field]) or (not overwrite and document[field] is None and document[field] != v[field]):
-                if field in v:
-                    print field
-                    print("Updating virus field " + str(field) + ", from \"" + str(document[field]) + "\" to \"" + v[field]) + "\""
+                #update doc_virus information if virus info is different, or if overwrite is false update doc_virus information only if virus info is different and not null
+                elif (overwrite and document[field] != v[field]) or (not overwrite and document[field] is None and document[field] != v[field]):
+                    print("Updating field " + str(field) + ", from \"" + str(document[field]) + "\" to \"" + str(v[field]) + "\" for strain: " + strain)
                     document[field] = v[field]
                     updated = True
         return updated
@@ -352,8 +351,8 @@ class upload(parse):
         for doc_sequence_info in doc_seqs:
             index += 1
             if doc_sequence_info[check_field] == virus_seq[check_field]:  # find the identical sequence info based on check field
-                updated_sequence = self.update_nested_field(strain, sequence_fields, doc_sequence_info, virus_seq, **kwargs)
-                updated_citation = self.update_nested_field(strain, citation_fields, document['citations'][index], virus_doc['citations'][0], **kwargs)
+                updated_sequence = self.update_base(doc_sequence_info, virus_seq, sequence_fields, strain, **kwargs)
+                updated_citation = self.update_base(document['citations'][index], virus_doc['citations'][0], citation_fields, strain, **kwargs)
         updated = False
         if updated_sequence:
             document['sequences'] = doc_seqs
@@ -362,24 +361,6 @@ class upload(parse):
             document['citations'][index] = document['citations'][index]
             updated = True
         return updated
-
-    def update_nested_field(self, strain, fields, doc_info, virus_info, overwrite, **kwargs):
-        '''
-        check for updates to nested sequences and citations fields.
-        '''
-        updated_sequence = False
-        for field in fields:
-            if field not in doc_info:
-                if field in virus_info:
-                    print("Creating field ", field, " assigned to \"", virus_info[field] + "\" for strain: " + strain)
-                    doc_info[field] = virus_info[field]
-                    updated_sequence = True
-            elif (overwrite and doc_info[field] != virus_info[field]) or (not overwrite and doc_info[field] is None and doc_info[field] != virus_info[field]):
-                if field in virus_info:
-                    print("Updating field " + str(field) + ", from \"" + str(doc_info[field]) + "\" to \"" + str(virus_info[field]) + "\" for strain: " + strain)
-                    doc_info[field] = virus_info[field]
-                    updated_sequence = True
-        return updated_sequence
 
 if __name__=="__main__":
     args = parser.parse_args()

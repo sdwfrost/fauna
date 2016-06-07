@@ -53,9 +53,9 @@ class update(upload):
             # Retrieve virus from table to see if it already exists
             if document is not None:
                 if 'citations' in document and 'sequences' in document:
-                    updated = self.update_sequence_citation_field(document, virus, 'accession', self.updateable_sequence_fields, self.updateable_citation_fields, overwrite=True)
+                    updated = self.update_sequence_citation_field(document, virus, 'accession', self.updateable_sequence_fields, self.updateable_citation_fields, **kwargs)
                 else:
-                    updated = self.update_document_meta(document, virus, self.updateable_sequence_fields + self.updateable_citation_fields, overwrite=True)
+                    updated = self.update_base(document, virus, self.updateable_sequence_fields + self.updateable_citation_fields, virus['strain'], **kwargs)
                 if updated:
                     document['timestamp'] = virus['timestamp']
                     r.table(self.table).insert(document, conflict="replace").run()
