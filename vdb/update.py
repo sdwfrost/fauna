@@ -26,11 +26,15 @@ class update(upload):
         accessions = []
         for doc in cursor:
             index = 0
-            for seq in doc['citations']:
-                if 'source' in seq:
-                    if seq['source'].lower() == 'genbank' or seq['source'].lower() == 'vipr':
-                        accessions.append(doc['sequences'][index]['accession'])
-                index += 1
+            if 'citations' in doc and 'sequences' in doc:
+                for seq in doc['citations']:
+                    if 'source' in seq:
+                        if seq['source'].lower() == 'genbank' or seq['source'].lower() == 'vipr':
+                            accessions.append(doc['sequences'][index]['accession'])
+                    index += 1
+            elif 'source' in doc and 'accession' in doc:
+                if doc['source'].lower() == 'genbank' or doc['source'].lower() == 'vipr':
+                    accessions.append(doc['accession'])
         return accessions
 
     def update_documents(self, **kwargs):
@@ -48,7 +52,10 @@ class update(upload):
                 raise Exception("Couldn't retrieve this virus")
             # Retrieve virus from table to see if it already exists
             if document is not None:
-                updated = self.update_sequence_citation_field(document, virus, 'accession', self.updateable_sequence_fields, self.updateable_citation_fields, **kwargs)
+                if 'citations' in document and 'sequences' in document:
+                    updated = self.update_sequence_citation_field(document, virus, 'accession', self.updateable_sequence_fields, self.updateable_citation_fields, overwrite=True)
+                else:
+                    updated = self.update_document_meta(document, virus, self.updateable_sequence_fields + self.updateable_citation_fields, overwrite=True)
                 if updated:
                     document['timestamp'] = virus['timestamp']
                     r.table(self.table).insert(document, conflict="replace").run()
