@@ -49,7 +49,8 @@ class download(object):
         print("Downloading all viruses from the table: " + self.table)
         self.viruses = list(r.db(self.database).table(self.table).run())
         for doc in self.viruses:
-            self.pick_best_sequence(doc)
+            if 'sequences' in doc and 'citations' in doc:
+                self.pick_best_sequence(doc)
         self.viruses = self.subsetting(self.viruses, **kwargs)
         if output:
             self.output(**kwargs)
