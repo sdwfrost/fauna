@@ -22,6 +22,51 @@ class zika_upload(upload):
             pass
         return tmp_name
 
+    def format_schema(self):
+        '''
+        '''
+        pass
+
+    def upload_documents(self, exclusive, **kwargs):
+        '''
+        Insert viruses into collection
+        '''
+        self.rethink_io.connect_rethink(self.database, self.rethink_host, self.auth_key)
+        db_relaxed_strains = self.relaxed_strains()
+        # Faster way to upload documents, downloads all database documents locally and looks for precense of strain in database
+        db_viruses = list(r.db(self.database).table(self.table).run())
+        db_strain_to_viruses = {db_v['strain']: db_v for db_v in db_viruses}
+        update_viruses = {}
+        upload_viruses = {}
+        for virus in self.viruses:
+            # determine the corresponding database strain name based on relaxed db and virus strain
+            db_strain = virus['strain']
+            if self.relax_name(virus['strain']) in db_relaxed_strains:
+                db_strain = db_relaxed_strains[self.relax_name(virus['strain'])]
+            if db_strain in db_strain_to_viruses.keys():  # virus already in database
+                update_viruses[db_strain] = virus
+            elif db_strain in upload_viruses.keys():  # virus already to be uploaded, need to check for updates to sequence information
+                upload_v = upload_viruses[db_strain]
+                self.update_document_sequence(upload_v, virus, **kwargs)  # add new sequeunce information to upload_v
+            else:  # new virus that needs to be uploaded
+                upload_viruses[virus['strain']] = virus
+        print("Inserting ", len(upload_viruses), "viruses into database", self.table)
+        try:
+            r.table(self.table).insert(upload_viruses.values()).run()
+        except:
+            raise Exception("Couldn't insert new viruses into database")
+        print("Checking for updates to ", len(update_viruses), "viruses in database", self.table)
+        updated = []
+        for db_strain, v in update_viruses.items():  # determine if virus has new information
+            document = db_strain_to_viruses[db_strain]
+            updated_meta = self.update_document_meta(document, v, self.overwritable_virus_fields, **kwargs)
+            if updated_meta:
+                document['timestamp'] = v['timestamp']
+                updated.append(document)
+        try:
+            r.table(self.table).insert(updated, conflict="replace").run()
+        except:
+            raise Exception("Couldn't update viruses already in database")
 
 if __name__=="__main__":
     args = parser.parse_args()
