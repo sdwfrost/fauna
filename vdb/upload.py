@@ -44,18 +44,11 @@ class upload(parse):
         self.rethink_io.check_table_exists(self.database, self.table)
 
         # fields that are needed to upload
-        self.index_field = ['strain']
-        self.sequence_upload_fields = []
-        self.sequence_optional_fields = ['locus', 'sequence', 'accession']  # ex. if from virological.org or not in a database
-        self.citation_upload_fields = ['source']
-        self.citation_optional_fields = ['authors', 'title', 'url']
+        self.sequence_fields = ['locus', 'sequence', 'accession']
+        self.citation_fields = ['source', 'authors', 'title', 'url']
         self.grouping_upload_fields = []
         self.grouping_optional_fields = []
-        self.virus_upload_fields = ['strain', 'virus', 'timestamp']
-        self.virus_optional_fields = ['division', 'location', 'date', 'country', 'region', 'host', 'public']
-        self.upload_fields = self.virus_upload_fields+self.sequence_upload_fields+self.citation_upload_fields+self.grouping_upload_fields
-        self.optional_fields = self.virus_optional_fields+self.sequence_optional_fields+self.citation_optional_fields+self.grouping_optional_fields
-        self.strains = {}
+        self.upload_fields = ['strain', 'virus', 'timestamp']
         self.simple_schema = False
 
     def upload(self, preview=False, **kwargs):
@@ -169,8 +162,8 @@ class upload(parse):
         Filter out viruses without correct format, check  optional and upload attributes
         '''
         print(str(len(self.viruses)) + " viruses before filtering")
-        self.rethink_io.check_optional_attributes(self.viruses, self.optional_fields)
-        self.viruses = filter(lambda v: self.rethink_io.check_required_attributes(v, self.upload_fields, self.index_field), self.viruses)
+        self.rethink_io.check_optional_attributes(self.viruses, [])
+        self.viruses = filter(lambda v: self.rethink_io.check_required_attributes(v, self.upload_fields, 'strain'), self.viruses)
         print(str(len(self.viruses)) + " viruses after filtering")
         self.format_schema(self.simple_schema)
 
