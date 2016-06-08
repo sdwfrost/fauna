@@ -70,11 +70,8 @@ class download(object):
         if select is not None:
             selections = self.parse_select_argument(select)
             for sel in selections:
-                if sel[0] in fields:
-                    cursor = filter(lambda doc: doc[sel[0]] in sel[1], cursor)
-                    print('Removed documents that were not in values specified (' + ','.join(sel[1]) + ') for field \'' + sel[0] + '\', remaining documents: ' + str(len(cursor)))
-                else:
-                    print(sel[0] + " is not in all documents, can't subset by that field")
+                cursor = filter(lambda doc: sel[0] in doc and doc[sel[0]] in sel[1], cursor)
+                print('Removed documents that were not in values specified (' + ','.join(sel[1]) + ') for field \'' + sel[0] + '\', remaining documents: ' + str(len(cursor)))
         if present is not None:
             for sel in present:
                 if sel in fields:
