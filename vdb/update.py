@@ -17,7 +17,7 @@ class update(upload):
         gi = self.get_GIs(accessions)
         self.viruses = self.get_entrez_viruses(gi, **kwargs)
         self.format()
-        self.format_schema()
+        self.format_schema(self.simple_schema)
         self.update_documents(**kwargs)
 
     def get_accessions(self):
@@ -55,7 +55,7 @@ class update(upload):
                 if 'citations' in document and 'sequences' in document:
                     updated = self.update_sequence_citation_field(document, virus, 'accession', self.updateable_sequence_fields, self.updateable_citation_fields, **kwargs)
                 else:
-                    updated = self.update_base(document, virus, self.updateable_sequence_fields + self.updateable_citation_fields, virus['strain'], **kwargs)
+                    updated = self.update_base(document, virus, virus['strain'], **kwargs)
                 if updated:
                     document['timestamp'] = virus['timestamp']
                     r.table(self.table).insert(document, conflict="replace").run()

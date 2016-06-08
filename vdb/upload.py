@@ -56,6 +56,7 @@ class upload(parse):
         self.upload_fields = self.virus_upload_fields+self.sequence_upload_fields+self.citation_upload_fields+self.grouping_upload_fields
         self.optional_fields = self.virus_optional_fields+self.sequence_optional_fields+self.citation_optional_fields+self.grouping_optional_fields
         self.strains = {}
+        self.simple_schema = False
 
     def upload(self, preview=False, **kwargs):
         '''
@@ -171,23 +172,24 @@ class upload(parse):
         self.rethink_io.check_optional_attributes(self.viruses, self.optional_fields)
         self.viruses = filter(lambda v: self.rethink_io.check_required_attributes(v, self.upload_fields, self.index_field), self.viruses)
         print(str(len(self.viruses)) + " viruses after filtering")
-        self.format_schema()
+        self.format_schema(self.simple_schema)
 
-    def format_schema(self):
+    def format_schema(self, simple_schema):
         '''
         move sequence information into nested 'sequences' field
         '''
-        for virus in self.viruses:
-            virus['sequences'] = [{}]
-            virus['citations'] = [{}]
-            for field in self.sequence_upload_fields + self.sequence_optional_fields:
-                if field in virus.keys():
-                    virus['sequences'][0][field] = virus[field]
-                    del virus[field]
-            for field in self.citation_upload_fields + self.citation_optional_fields:
-                if field in virus.keys():
-                    virus['citations'][0][field] = virus[field]
-                    del virus[field]
+        if not simple_schema:
+            for virus in self.viruses:
+                virus['sequences'] = [{}]
+                virus['citations'] = [{}]
+                for field in self.sequence_upload_fields + self.sequence_optional_fields:
+                    if field in virus.keys():
+                        virus['sequences'][0][field] = virus[field]
+                        del virus[field]
+                for field in self.citation_upload_fields + self.citation_optional_fields:
+                    if field in virus.keys():
+                        virus['citations'][0][field] = virus[field]
+                        del virus[field]
 
     def upload_documents(self, exclusive, **kwargs):
         '''
@@ -220,12 +222,14 @@ class upload(parse):
                 raise Exception("Couldn't insert new viruses into database")
             print("Checking for updates to ", len(update_viruses), "viruses in database", self.table)
             updated = []
-            for db_strain, v in update_viruses.items():  # determine if virus has new information
+            for db_strain, virus in update_viruses.items():  # determine if virus has new information
                 document = db_strain_to_viruses[db_strain]
-                updated_sequence = self.update_document_sequence(document, v, **kwargs)
-                updated_base = self.update_base(document, v, v['strain'], **kwargs)
+                updated_sequence = False
+                if not self.simple_schema:
+                    updated_sequence = self.update_document_sequence(document, virus, **kwargs)
+                updated_base = self.update_base(document, virus, virus['strain'], **kwargs)
                 if updated_sequence or updated_base:
-                    document['timestamp'] = v['timestamp']
+                    document['timestamp'] = virus['timestamp']
                     updated.append(document)
             try:
                 r.table(self.table).insert(updated, conflict="replace").run()
@@ -255,7 +259,9 @@ class upload(parse):
                         raise Exception("Couldn't insert this virus")
                 # Virus exists in table so just add sequence information and update meta data if needed
                 else:
-                    updated_sequence = self.update_document_sequence(document, virus, **kwargs)
+                    updated_sequence = False
+                    if not self.simple_schema:
+                        updated_sequence = self.update_document_sequence(document, virus, **kwargs)
                     updated_base = self.update_base(document, virus, virus['strain'], **kwargs)
                     if updated_sequence or updated_base:
                         document['timestamp'] = virus['timestamp']
