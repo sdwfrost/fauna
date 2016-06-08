@@ -55,7 +55,6 @@ class upload(parse):
         self.virus_optional_fields = ['division', 'location', 'date', 'country', 'region', 'host', 'public']
         self.upload_fields = self.virus_upload_fields+self.sequence_upload_fields+self.citation_upload_fields+self.grouping_upload_fields
         self.optional_fields = self.virus_optional_fields+self.sequence_optional_fields+self.citation_optional_fields+self.grouping_optional_fields
-        self.overwritable_virus_fields = ['date', 'country', 'division', 'location', 'virus', 'public', 'host', 'region']
         self.strains = {}
 
     def upload(self, preview=False, **kwargs):
@@ -224,7 +223,7 @@ class upload(parse):
             for db_strain, v in update_viruses.items():  # determine if virus has new information
                 document = db_strain_to_viruses[db_strain]
                 updated_sequence = self.update_document_sequence(document, v, **kwargs)
-                updated_base = self.update_base(document, v, v.keys(), v['strain'], **kwargs)
+                updated_base = self.update_base(document, v, v['strain'], **kwargs)
                 if updated_sequence or updated_base:
                     document['timestamp'] = v['timestamp']
                     updated.append(document)
@@ -257,7 +256,7 @@ class upload(parse):
                 # Virus exists in table so just add sequence information and update meta data if needed
                 else:
                     updated_sequence = self.update_document_sequence(document, virus, **kwargs)
-                    updated_base = self.update_base(document, virus, virus.keys(), virus['strain'], **kwargs)
+                    updated_base = self.update_base(document, virus, virus['strain'], **kwargs)
                     if updated_sequence or updated_base:
                         document['timestamp'] = virus['timestamp']
                         r.table(self.table).insert(document, conflict="replace").run()
@@ -281,14 +280,13 @@ class upload(parse):
         name = re.sub(r"/", '', name)
         return name
 
-    def update_base(self, document, v, fields, strain, overwrite, **kwargs):
+    def update_base(self, document, v, strain, overwrite, **kwargs):
         '''
         update overwritable fields at the base level of the document
         '''
-        updated =False
-        check_fields = [field for field in fields if field not in ['timestamp']]
-        for field in check_fields:
-            if field in v and (isinstance(v[field], (basestring, int, float, bool))):
+        updated = False
+        for field in v:
+            if v[field] is not None and field != 'timestamp':           
                 # update if field not present in document
                 if field not in document:
                     print("Creating field ", field, " assigned to \"", v[field] + "\" for strain: " + strain)
@@ -317,12 +315,12 @@ class upload(parse):
                     if all(virus_seq['accession'] != seq_info['accession'] for seq_info in doc_seqs):
                         updated = self.append_new_sequence(document, virus_seq, virus_citation)
                     else:
-                        updated = self.update_sequence_citation_field(document, v, 'accession', self.sequence_upload_fields+self.sequence_optional_fields, self.citation_optional_fields, **kwargs)
+                        updated = self.update_sequence_citation_field(document, v, 'accession', **kwargs)
                 else:  # if it doesn't have an accession, see if sequence already in document
                     if all(virus_seq['sequence'] != seq_info['sequence'] for seq_info in doc_seqs):
                         updated = self.append_new_sequence(document, virus_seq, virus_citation)
                     else:
-                        updated = self.update_sequence_citation_field(document, v, 'sequence', self.sequence_upload_fields+self.sequence_optional_fields, self.citation_optional_fields, **kwargs)
+                        updated = self.update_sequence_citation_field(document, v, 'sequence', **kwargs)
             if len(doc_seqs) == 1 and doc_seqs[0]['accession'] is None and doc_seqs[0]['sequence'] is None:	 # doc 'sequences' currently empty
                 document['sequences'] = v['sequences']
                 updated = True
@@ -338,7 +336,7 @@ class upload(parse):
         document['citations'].append(virus_citation)
         return True
 
-    def update_sequence_citation_field(self, document, virus_doc, check_field, sequence_fields, citation_fields, **kwargs):
+    def update_sequence_citation_field(self, document, virus_doc, check_field, **kwargs):
         '''
         Based on the check_field (accession or sequence), look for updated sequence and citation information
         '''
@@ -351,8 +349,8 @@ class upload(parse):
         for doc_sequence_info in doc_seqs:
             index += 1
             if doc_sequence_info[check_field] == virus_seq[check_field]:  # find the identical sequence info based on check field
-                updated_sequence = self.update_base(doc_sequence_info, virus_seq, sequence_fields, strain, **kwargs)
-                updated_citation = self.update_base(document['citations'][index], virus_doc['citations'][0], citation_fields, strain, **kwargs)
+                updated_sequence = self.update_base(doc_sequence_info, virus_seq, strain, **kwargs)
+                updated_citation = self.update_base(document['citations'][index], virus_doc['citations'][0], strain, **kwargs)
         updated = False
         if updated_sequence:
             document['sequences'] = doc_seqs
